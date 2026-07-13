@@ -1,6 +1,6 @@
 import os
 import pickle
-from turtle import pd
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
@@ -49,6 +49,6 @@ def train_model(data_path, model_path):
 
 if __name__ == "__main__":
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(BASE_DIR, "dataset_features.csv")
+    DATA_PATH = os.path.join(os.path.dirname(BASE_DIR), "datasets", "dataset_features.csv")
     MODEL_PATH = os.path.join(BASE_DIR, "model.pkl")
     train_model(DATA_PATH, MODEL_PATH)
