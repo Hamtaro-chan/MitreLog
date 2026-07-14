@@ -4,12 +4,19 @@ import pickle
 import re
 import sys
 import argparse
+import pandas as pd
+
+import urllib
+from mitreMap import map_to_mitre
 
 # Log parser
 def parse_arguments(line_args):
     match = re.search(r'"[A-Z]+\s+([^\s?]+(?:\?[^\s"]+)?)"', line_args)
     if match:
         return match.group(1)
+    match_fallback = re.search(r'"[A-Z]+\s+([^\s"]+)', line_args)
+    if match_fallback:
+        return match_fallback.group(1)
     return line_args.strip()
 
 # Feature extraction functions
@@ -39,7 +46,7 @@ def count_keywords(payload):
         "select", "union", "insert", "drop", "delete", "update", # SQLi
         "script", "alert", "onerror", "onload", "eval",          # XSS
         "etc/passwd", "cmd.exe", "powershell", "bin/bash",       # Command/Path traversal
-        "whoami", "ping"
+        "whoami", "ping", "ls", "rm", "wget", "curl", "nc", "netcat"  # Command execution
     ]
     count = 0
     for word in keywords:
@@ -57,10 +64,6 @@ def extract_features(payload):
     ]
     return features
 
-# Mapping to Mitre Attack Types
-def map_to_mitre(payload):
-    return None  # Placeholder for Mitre mapping logic  
-
 # Main function to load model and process log file
 def load_model(log_path, model_path):
     """Loads the trained model and processes the log file."""
@@ -77,6 +80,10 @@ def load_model(log_path, model_path):
     total_lines = 0
     threats_detected = 0
     incident_reports = []
+    BATCH_SIZE = 50000  # Process logs in batches of 50,000 lines
+    batch_features = []
+    batch_metadata = []
+    STATIC_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.css', '.js', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot')
 
     print(f"[*] Processing log file: {log_path}...")
     with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -84,27 +91,84 @@ def load_model(log_path, model_path):
             if not line.strip():
                 continue
             payload = parse_arguments(line)
-            features = extract_features(payload)
-            prediction = model.predict([features])[0]
-            mitre_mapping = map_to_mitre(payload)
-            total_lines += 1
-            if prediction == 1:
-                threats_detected += 1
-                incident_reports.append({
-                    "line": idx,
-                    "payload": payload,
-                    "intel": mitre_mapping
-                })
-            print(f"Payload: {payload}\nPrediction: {'Malicious' if prediction == 1 else 'Safe'}\nMitre Mapping: {mitre_mapping}\n")
 
-    print(f"[*] Analysis complete.")
-    print(f"Total lines processed: {total_lines}")
-    print(f"Threats detected: {threats_detected}")
+            payload_lower = payload.lower()
+            if payload_lower.endswith(STATIC_EXTENSIONS):
+                if "?" not in payload and "=" not in payload and "../" not in payload:
+                    total_lines += 1
+                    continue
+            normalized_payload = urllib.parse.unquote(payload)
+
+            features = extract_features(normalized_payload)
+            batch_features.append(features)
+            batch_metadata.append((idx, payload))
+            
+            total_lines += 1
+            if len(batch_features) >= BATCH_SIZE:
+                predictions = model.predict(batch_features)
+                for idx, prediction in enumerate(predictions):
+                    if prediction == 1:
+                        threats_detected += 1
+                        line_num, raw_payload = batch_metadata[idx]
+                        mitre_mapping = map_to_mitre(raw_payload)
+                        incident_reports.append({
+                            "line": line_num,
+                            "payload": raw_payload,
+                            "intel": mitre_mapping
+                        })
+                batch_features.clear()
+                batch_metadata.clear()
+
+            if total_lines % 50000 == 0:
+                print(f"[*] Progress Update: Evaluated {total_lines} lines...")
+
+    if batch_features:
+            X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_keywords", "entropy"])
+            predictions = model.predict(X_df)
+            for idx, prediction in enumerate(predictions):
+                if prediction == 1:
+                    threats_detected += 1
+                    line_num, raw_payload = batch_metadata[idx]
+                    mitre_mapping = map_to_mitre(raw_payload) 
+                    incident_reports.append({
+                        "line": line_num,
+                        "payload": raw_payload,
+                        "intel": mitre_mapping
+                    })
+
+     # Print analysis results
+    print("\n" + "="*75)
+    print("         MITRELOG: INTELLIGENT THREAT DETECTION ENGINE")
+    print("="*75)
+    print(f" Target Resource File   : {os.path.basename(log_path)}")
+    print(f" Total Log Metrics      : {total_lines} transactions evaluated")
+    print(f" Threat Signatures      : {threats_detected} anomalies flagged")
+    print("="*75 + "\n")
+    
+    if not incident_reports:
+        print("[+] SUCCESS: No malicious anomalies detected within this log configuration pipeline.")
+    else:
+        for inc in incident_reports:
+            intel = inc["intel"]
+            print(f"[!] MALICIOUS ANOMALY DETECTED [Line {inc['line']}]")
+            print(f"    ↳ Parsed Payload   : {inc['payload']}")
+            print(f"    ↳ Attack Profiling : {intel['attack_type']}")
+            print(f"    ↳ MITRE ATT&CK     : {intel['mitre_id']} — {intel['mitre_technique']}")
+            print(f"    ↳ Assigned Severity: {intel['severity']}")
+            print(f"    ↳ Intel Scope      : {intel['description']}")
+            print("-" * 65)
+            
+    print("\n" + "="*75)
+    print("                   [ SECURITY ANALYSIS REPORT END ]")
+    print("="*75 + "\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Load trained model and process log file.")
-    parser.add_argument("log_path", help="Path to the log file to analyze.")
-    parser.add_argument("model_path", help="Path to the trained model file (model.pkl).")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "model.pkl")
+    
+    parser = argparse.ArgumentParser(description="MitreLog: Random Forest log threat classifier engine mapped to the MITRE ATT&CK framework.")
+    parser.add_argument("--log", dest="log_path", help="Path to the log file to analyze.")
+    parser.add_argument("--model", dest="model_path", help="Path to the trained model file (model.pkl).", default=DEFAULT_MODEL_PATH)
     args = parser.parse_args()
 
     load_model(args.log_path, args.model_path)
