@@ -12,6 +12,7 @@ def parse_arguments(line_args):
         return match.group(1)
     return line_args.strip()
 
+# Feature extraction functions
 def compute_entropy(payload):
     """Calculates the Shannon entropy of a string."""
     if not payload:
@@ -60,6 +61,7 @@ def extract_features(payload):
 def map_to_mitre(payload):
     return None  # Placeholder for Mitre mapping logic  
 
+# Main function to load model and process log file
 def load_model(log_path, model_path):
     """Loads the trained model and processes the log file."""
     if not os.path.exists(model_path):
