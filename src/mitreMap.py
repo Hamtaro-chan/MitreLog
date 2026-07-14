@@ -79,9 +79,13 @@ def map_to_mitre(payload):
                 "description": signature["description"]
             }
     return {
-        "attack_type": "Anomalous Web Payload Signature",
-        "mitre_id": "T1190",
-        "mitre_technique": "Exploit Public-Facing Application",
-        "severity": "MEDIUM",
-        "description": "The payload structural metric profile displays strong statistical deviations, signaling potential exploration or zero-day threats."
+        "attack_type": "Unclassified Metric/Behavioral Anomaly",
+        "mitre_id": "N/A (Manual Review Required)",
+        "mitre_technique": "Potential False Positive or Unmapped Vector",
+        "severity": "LOW/MEDIUM",
+        "description": (
+            "The Random Forest model flagged this payload due to high metric deviancy "
+            "(atypical length or entropy score), but no explicit malicious threat signatures "
+            "were matched. Manual verification is recommended to determine if this is a benign edge case."
+        )
     }

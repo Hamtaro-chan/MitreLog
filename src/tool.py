@@ -7,6 +7,7 @@ import argparse
 import pandas as pd
 
 import urllib
+from behavioral_analysis import BruteForceTracker
 from mitreMap import map_to_mitre
 
 # Log parser
@@ -18,6 +19,10 @@ def parse_arguments(line_args):
     if match_fallback:
         return match_fallback.group(1)
     return line_args.strip()
+
+def extract_ip(line_args):
+    match = re.match(r'^([\d\.]+|[a-fA-F0-9:]+)', line_args)
+    return match.group(1) if match else "UNKNOWN_IP"
 
 # Feature extraction functions
 def compute_entropy(payload):
@@ -87,12 +92,21 @@ def load_model(log_path, model_path):
 
     print(f"[*] Processing log file: {log_path}...")
     with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+        bf_tracker = BruteForceTracker(threshold=5, time_window=60)
+
         for idx, line in enumerate(f, start=1):
-            if not line.strip():
+            cleaned_line = line.strip()
+            if not cleaned_line:
                 continue
             payload = parse_arguments(line)
-
             payload_lower = payload.lower()
+            ip_address = extract_ip(cleaned_line)
+
+            bf_incident = bf_tracker.evaluate_transaction(idx, ip_address, payload, cleaned_line)
+            if bf_incident:
+                threats_detected += 1
+                incident_reports.append(bf_incident)
+
             if payload_lower.endswith(STATIC_EXTENSIONS):
                 if "?" not in payload and "=" not in payload and "../" not in payload:
                     total_lines += 1
@@ -101,7 +115,7 @@ def load_model(log_path, model_path):
 
             features = extract_features(normalized_payload)
             batch_features.append(features)
-            batch_metadata.append((idx, payload))
+            batch_metadata.append((idx, payload, cleaned_line))
             
             total_lines += 1
             if len(batch_features) >= BATCH_SIZE:
@@ -109,11 +123,12 @@ def load_model(log_path, model_path):
                 for idx, prediction in enumerate(predictions):
                     if prediction == 1:
                         threats_detected += 1
-                        line_num, raw_payload = batch_metadata[idx]
+                        line_num, raw_payload, full_line_str = batch_metadata[idx]
                         mitre_mapping = map_to_mitre(raw_payload)
                         incident_reports.append({
                             "line": line_num,
                             "payload": raw_payload,
+                            "full_line": full_line_str,
                             "intel": mitre_mapping
                         })
                 batch_features.clear()
@@ -128,11 +143,12 @@ def load_model(log_path, model_path):
             for idx, prediction in enumerate(predictions):
                 if prediction == 1:
                     threats_detected += 1
-                    line_num, raw_payload = batch_metadata[idx]
+                    line_num, raw_payload, full_line_str = batch_metadata[idx]
                     mitre_mapping = map_to_mitre(raw_payload) 
                     incident_reports.append({
                         "line": line_num,
                         "payload": raw_payload,
+                        "full_line": full_line_str,
                         "intel": mitre_mapping
                     })
 
@@ -152,6 +168,7 @@ def load_model(log_path, model_path):
             intel = inc["intel"]
             print(f"[!] MALICIOUS ANOMALY DETECTED [Line {inc['line']}]")
             print(f"    ↳ Parsed Payload   : {inc['payload']}")
+            print(f"    ↳ Full Log Line    : {inc['full_line']}")
             print(f"    ↳ Attack Profiling : {intel['attack_type']}")
             print(f"    ↳ MITRE ATT&CK     : {intel['mitre_id']} — {intel['mitre_technique']}")
             print(f"    ↳ Assigned Severity: {intel['severity']}")
