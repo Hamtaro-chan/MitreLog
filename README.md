@@ -77,15 +77,17 @@ MitreLog/
 ## Quick Start
 Run MitreLog on a sample log file:
 
-       ```bash
-       python src/tool.py --log <PATH_FILE>
-       ```
-example:
 
-       ```bash
-       python src/tool.py --log examples/input-sample1.txt
-       ```
-       
+```bash
+python src/tool.py --log <FILE_PATH>
+```
+
+Example:
+
+```bash
+python src/tool.py --log examples/input-sample-1.txt
+```
+
 Example Input: in txt and log file
 ```text
 10.82.30.199 - - [28/Jul/2009:08:58:49 -0700] "GET /assets/img/dummy/secondary-news-3.jpg HTTP/1.1" 200 5604

@@ -45,6 +45,12 @@ pip install -r requirements.txt
 ### Analyse a Log File
 
 ```bash
+python src/tool.py --log <FILE_PATH>
+```
+
+Example:
+
+```bash
 python src/tool.py --log examples/input-sample-1.txt
 ```
 
