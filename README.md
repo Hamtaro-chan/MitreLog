@@ -76,11 +76,13 @@ MitreLog/
 
 ## Quick Start
 Run MitreLog on a sample log file:
+
        ```bash
        python src/tool.py --log <PATH_FILE>
        ```
 example:
-       ``bash
+
+       ```bash
        python src/tool.py --log examples/input-sample1.txt
        ```
        
