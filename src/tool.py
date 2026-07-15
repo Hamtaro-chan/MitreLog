@@ -10,6 +10,7 @@ import pandas as pd
 import urllib
 from behavioral_analysis import BruteForceTracker
 from mitreMap import map_to_mitre
+from reporter import ReportGenerator
 
 # Log parser
 def parse_arguments(line_args):
@@ -45,6 +46,14 @@ def count_special_chars(payload):
     special_chars = r"[<>\"'()\[\]{}%;&|]"
     return len(re.findall(special_chars, payload))
 
+def count_attack_patterns(payload):
+    """Counts explicit structural evasion tokens like traversals and SQL comments."""
+    patterns = [r"\.\./", r"\.\.\\", r"\-\-"]
+    count = 0
+    for pattern in patterns:
+        count += len(re.findall(pattern, payload))
+    return count
+
 def count_keywords(payload):
     """Counts common malicious keywords used in attacks."""
     payload_lower = payload.lower()
@@ -52,7 +61,7 @@ def count_keywords(payload):
         r"\bselect\b", r"\bunion\b", r"\binsert\b", r"\bdrop\b", r"\bdelete\b", r"\bupdate\b", # SQLi
         r"\bscript\b", r"\balert\b", r"\bonerror\b", r"\bonload\b", r"\beval\b", r"<script>",        # XSS
         r"etc/passwd", r"cmd.exe", r"powershell", r"bin/bash",       # Command/Path traversal
-        r"whoami", r"ping", r"ls", r"rm", r"wget", r"curl", r"nc", r"netcat"  # Command execution
+        r"\bwhoami\b", r"\bping\b", r"\bls\b", r"\brm\b", r"\bwget\b", r"\bcurl\b", r"\bnc\b", r"\bnetcat\b"  # Command execution
     ]
     count = 0
     for word in keywords:
@@ -65,6 +74,7 @@ def extract_features(payload):
     features = [
         len(clean_payload),
         count_special_chars(clean_payload),
+        count_attack_patterns(clean_payload),
         count_keywords(clean_payload),
         round(compute_entropy(clean_payload), 3)
     ]
@@ -114,10 +124,10 @@ def load_model(log_path, model_path):
             normalized_payload = urllib.parse.unquote(payload)
 
             features = extract_features(normalized_payload)
-            length, num_special_chars, num_keywords, entropy = features
+            length, num_special_chars, num_attack_patterns, num_keywords, entropy = features
             high_risk_chars = r"[<>\"';\(\)]"
             num_high_risk = len(re.findall(high_risk_chars, normalized_payload))
-            if num_high_risk == 0 and num_keywords == 0:
+            if num_high_risk == 0 and num_keywords == 0 and num_attack_patterns == 0:
                 total_lines += 1
                 continue
 
@@ -126,13 +136,14 @@ def load_model(log_path, model_path):
             
             total_lines += 1
             if len(batch_features) >= BATCH_SIZE:
-                X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_keywords", "entropy"])
+                X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_attack_patterns", "num_keywords", "entropy"])                
                 predictions = model.predict(X_df)
                 for b_idx, prediction in enumerate(predictions):
                     if prediction == 1:
                         threats_detected += 1
                         line_num, raw_payload, full_line_str = batch_metadata[b_idx]
-                        mitre_mapping = map_to_mitre(raw_payload)
+                        decoded_payload = urllib.parse.unquote(raw_payload)
+                        mitre_mapping = map_to_mitre(decoded_payload)
                         incident_reports.append({
                             "line": line_num,
                             "payload": raw_payload,
@@ -146,7 +157,7 @@ def load_model(log_path, model_path):
                 print(f"[*] Progress Update: Evaluated {total_lines} lines...")
 
     if batch_features:
-            X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_keywords", "entropy"])
+            X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_attack_patterns", "num_keywords", "entropy"])
             predictions = model.predict(X_df)
             for b_idx, prediction in enumerate(predictions):
                 if prediction == 1:
@@ -161,31 +172,9 @@ def load_model(log_path, model_path):
                     })
 
      # Print analysis results
-    print("\n" + "="*75)
-    print("         MITRELOG: INTELLIGENT THREAT DETECTION ENGINE")
-    print("="*75)
-    print(f" Target Resource File   : {os.path.basename(log_path)}")
-    print(f" Total Log Metrics      : {total_lines} transactions evaluated")
-    print(f" Threat Signatures      : {threats_detected} anomalies flagged")
-    print("="*75 + "\n")
-    
-    if not incident_reports:
-        print("[+] SUCCESS: No malicious anomalies detected within this log configuration pipeline.")
-    else:
-        for inc in incident_reports:
-            intel = inc["intel"]
-            print(f"[!] MALICIOUS ANOMALY DETECTED [Line {inc['line']}]")
-            print(f"    ↳ Parsed Payload   : {inc['payload']}")
-            print(f"    ↳ Full Log Line    : {inc['full_line']}")
-            print(f"    ↳ Attack Profiling : {intel['attack_type']}")
-            print(f"    ↳ MITRE ATT&CK     : {intel['mitre_id']} — {intel['mitre_technique']}")
-            print(f"    ↳ Assigned Severity: {intel['severity']}")
-            print(f"    ↳ Intel Scope      : {intel['description']}")
-            print("-" * 65)
-            
-    print("\n" + "="*75)
-    print("                   [ SECURITY ANALYSIS REPORT END ]")
-    print("="*75 + "\n")
+    report_generator = ReportGenerator(log_path, total_lines, incident_reports)
+    report_generator.generate_report()
+
 
 if __name__ == "__main__":
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
