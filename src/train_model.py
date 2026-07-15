@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+import joblib
 
 def train_model(data_path, model_path):
     # Load the preprocessed data
@@ -43,8 +44,7 @@ def train_model(data_path, model_path):
 
     #Export the model to a file
     print(f"[*] Exporting trained model to {model_path}...")
-    with open(model_path, 'wb') as f:
-        pickle.dump(model, f)
+    joblib.dump(model, model_path, compress=3)
     print("[+] Model successfully exported!")
 
 if __name__ == "__main__":

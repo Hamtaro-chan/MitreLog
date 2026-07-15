@@ -4,6 +4,7 @@ import pickle
 import re
 import sys
 import argparse
+import joblib
 import pandas as pd
 
 import urllib
@@ -48,14 +49,14 @@ def count_keywords(payload):
     """Counts common malicious keywords used in attacks."""
     payload_lower = payload.lower()
     keywords = [
-        "select", "union", "insert", "drop", "delete", "update", # SQLi
-        "script", "alert", "onerror", "onload", "eval",          # XSS
-        "etc/passwd", "cmd.exe", "powershell", "bin/bash",       # Command/Path traversal
-        "whoami", "ping", "ls", "rm", "wget", "curl", "nc", "netcat"  # Command execution
+        r"\bselect\b", r"\bunion\b", r"\binsert\b", r"\bdrop\b", r"\bdelete\b", r"\bupdate\b", # SQLi
+        r"\bscript\b", r"\balert\b", r"\bonerror\b", r"\bonload\b", r"\beval\b", r"<script>",        # XSS
+        r"etc/passwd", r"cmd.exe", r"powershell", r"bin/bash",       # Command/Path traversal
+        r"whoami", r"ping", r"ls", r"rm", r"wget", r"curl", r"nc", r"netcat"  # Command execution
     ]
     count = 0
     for word in keywords:
-        count += payload_lower.count(word)
+        count += len(re.findall(word, payload_lower))
     return count
 
 def extract_features(payload):
@@ -79,8 +80,7 @@ def load_model(log_path, model_path):
         raise FileNotFoundError(f"The specified log path does not exist: {log_path}")
 
     print(f"[*] Loading trained model from {model_path}...")
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
+    model = joblib.load(model_path)
 
     total_lines = 0
     threats_detected = 0
@@ -115,7 +115,9 @@ def load_model(log_path, model_path):
 
             features = extract_features(normalized_payload)
             length, num_special_chars, num_keywords, entropy = features
-            if num_special_chars == 0 and num_keywords == 0:
+            high_risk_chars = r"[<>\"';\(\)]"
+            num_high_risk = len(re.findall(high_risk_chars, normalized_payload))
+            if num_high_risk == 0 and num_keywords == 0:
                 total_lines += 1
                 continue
 
