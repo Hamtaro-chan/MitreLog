@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 raw_data/
 .venv/
-
+.reports/
 # C extensions
 *.so
 

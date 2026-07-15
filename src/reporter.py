@@ -18,7 +18,7 @@ class ReportGenerator:
 
         with open(filepath, 'w', encoding="utf-8") as report_file:
             report_file.write("="*90 + "\n")
-            report_file.write("              MITRELOG: INTELLIGENT THREAT DETECTION ENGINE REPORT\n")
+            report_file.write("              MITRELOG: THREAT DETECTION ENGINE REPORT\n")
             report_file.write("="*90 + "\n")
 
             report_file.write(f" Target Resource File   : {os.path.basename(self.log_path)}\n")
