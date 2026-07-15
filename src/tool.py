@@ -114,16 +114,22 @@ def load_model(log_path, model_path):
             normalized_payload = urllib.parse.unquote(payload)
 
             features = extract_features(normalized_payload)
+            length, num_special_chars, num_keywords, entropy = features
+            if num_special_chars == 0 and num_keywords == 0:
+                total_lines += 1
+                continue
+
             batch_features.append(features)
             batch_metadata.append((idx, payload, cleaned_line))
             
             total_lines += 1
             if len(batch_features) >= BATCH_SIZE:
-                predictions = model.predict(batch_features)
-                for idx, prediction in enumerate(predictions):
+                X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_keywords", "entropy"])
+                predictions = model.predict(X_df)
+                for b_idx, prediction in enumerate(predictions):
                     if prediction == 1:
                         threats_detected += 1
-                        line_num, raw_payload, full_line_str = batch_metadata[idx]
+                        line_num, raw_payload, full_line_str = batch_metadata[b_idx]
                         mitre_mapping = map_to_mitre(raw_payload)
                         incident_reports.append({
                             "line": line_num,
@@ -140,10 +146,10 @@ def load_model(log_path, model_path):
     if batch_features:
             X_df = pd.DataFrame(batch_features, columns=["length", "num_special_chars", "num_keywords", "entropy"])
             predictions = model.predict(X_df)
-            for idx, prediction in enumerate(predictions):
+            for b_idx, prediction in enumerate(predictions):
                 if prediction == 1:
                     threats_detected += 1
-                    line_num, raw_payload, full_line_str = batch_metadata[idx]
+                    line_num, raw_payload, full_line_str = batch_metadata[b_idx]
                     mitre_mapping = map_to_mitre(raw_payload) 
                     incident_reports.append({
                         "line": line_num,
